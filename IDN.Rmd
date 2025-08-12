@@ -1,0 +1,883 @@
+---
+title: "Plant Investment in Indonesia: A De-Carbonised Electrical Supply Vision to 2040"
+output: html_document
+date: "2025-01-12"
+---
+
+# Plant Investment in Indonesia: A De-Carbonised Electrical Supply Vision to 2040
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(sf)            
+library(raster)       
+library(tmap)          
+library(ggplot2)  
+library(terra)         
+library(dplyr)        
+library(rnaturalearth) 
+library(rmapshaper)    
+library(dbscan)       
+library(prettymapr)    
+library(ggspatial)     
+library(sp)
+library(ncdf4)
+library(gstat)
+library(viridis)
+```
+
+## Introduction
+
+Indonesia, a developing country with a population of approximately 283.5 million, faces rapidly growing energy demands. Currently, coal dominates Indonesia’s energy mix as one of the country’s largest exports and a key energy source. However, this reliance conflicts with global goals for a sustainable future. To address this, President Prabowo Subianto committed at the G20 summit to phase out coal entirely and boost renewable energy capacity by 2040.
+
+The Total Energy Supply (TES) shows that coal and oil constitute the majority, with renewables making up less than a quarter. Transitioning from coal will be challenging as the population is projected to reach 311.8 million by 2040 as according to World Bank (World Bank, 2024), and energy demand is expected to rise to approximately 840 TWh (the electricity consumption per capita for 2022 was 1.272 MWh per capita (International Energy Agency (IEA), 2023). Drawing off this with a growth of approximately 5% each year for the next few decades (Ember, 2023), a value of 840 TWh is found for 2040).
+
+This report aims to identify suitable locations for solar sites in Indonesia to meet 38% of the country's projected energy demand by 2040, and ultimately assess the economic viability of this large-scale project.
+
+## Important Criteria to consider for solar plant locations
+
+### Solar Radiation
+
+Solar radiance is quite an obvious factor as regions with higher solar radiance will allow for more efficient energy generation. In general, it is found that the south western parts of Indonesia are exposed to the most solar radiation on average (Agung Wahyuono and Magenika Julian, 2018). This makes these areas of Indonesia ideal for developing new solar plants. To assess an optimal location for a solar energy to be generated it is important to consider how solar radiance also changes throughout the seasons. With Indonesia having only two major seasons, wet and dry, it would be ideal to assess the solar radiance in both seasons.
+
+### Land cover
+
+Indonesia's government has faced many challenges when balancing short-term economic growth with environmental protection. The country’s rapid development, particularly in sectors like forestry, has often prioritised immediate economic gains over long-term sustainability. This has led to deforestation and significant environmental degradation. As the World Bank highlights, the poor implementation of environmental regulations has had substantial effects on Indonesia’s environment (World Bank, 2014). It is therefore crucial to consider environmental factors carefully when selecting locations for solar power plants.
+
+Bodies of water and water lines are also to be considered given that it is not possible to develop a solar plant upon water.
+
+### Proximity to infrastructure
+
+Economic factors are also significant when finding optimal locations for solar plants. There would be no use generating energy in areas where the population is sparse, and the electricity grid is far away. Areas close to existing transmission lines and roads are  favourable; they reduce the investment required for infrastructure development. Studies, such as (Ruiz *et al.*, 2020), highlight the importance of assessing infrastructure availability when selecting sites. Regions: Java and Sumatera, being well-connected to the national grid and having large populations, are often considered for large-scale projects.
+
+### Terrain
+
+It is important to also consider the physical features of the surface for which the solar plants are to develop on. This includes the slope of the land, while there is no unified restrictions on maximum slopes solar plants with reference to the International Renewable Energy Agency (IRENA) (Nebey, Taye and Workineh, 2020) it is normally assumed that a slope of less than 3% is preferred and a slope of more than 15% is not suitable for building such sites (Kadek Aldrin Wiguna, 2016). Given that it would be difficult and unsafe for installation at very steep inclined, the energy generation efficiency of the solar panels also decreases with increasing slopes as shown in a study held in Muscat (Charabi, Rhouma and Gastli, 2014).
+
+## Current Snapshot of Indonesia's renewable energy mix
+
+Existing / Planned / Under construction power plants are plotted below.
+
+The data comes from the *World Resource Institute*, which provides a diverse range of open data through its data profile.
+
+```{r powerplants}
+indonesia <- ne_states(country = "indonesia", returnclass = "sf")
+setwd("/Users/igla/Desktop/data/indonesia/old power plants")
+powerplants <- st_read("powerplants.csv")
+powerplants_sf <- st_as_sf(
+  powerplants,
+  coords = c("longitude", "latitude"),
+  crs = 4326                         
+)
+powerplants_sf$type_status <- paste(powerplants_sf$type, powerplants_sf$status, sep = "_")
+
+#Convert all type_status values to lowercase for consistency
+powerplants_sf$type_status <- tolower(powerplants_sf$type_status)
+
+powerplants_sf$capacity_mw <- as.numeric(powerplants_sf$capacity_mw)
+ggplot() +
+  #Plot the Indonesia vector data
+  geom_sf(data = indonesia, fill = "ivory", colour = "black") +
+  
+  #Plot the power plants with different colours for status and type
+  geom_sf(data = powerplants_sf, 
+          aes(colour = type_status, size = capacity_mw), 
+          alpha = 0.7) +
+  
+  #Customise the colours based on the type and status
+  scale_colour_manual(
+    values = c(
+      "solar_planned" = "khaki",
+      "solar_construction" = "gold3",
+      "wind_planned" = "darkseagreen2",
+      "hydro_existing" = "steelblue4",
+      "hydro_planned" = "lightblue",
+      "geothermal_existing" = "lightpink"
+    ),
+    breaks = c("solar_construction", "solar_planned", "hydro_planned", 
+               "wind_planned", "hydro_existing", "geothermal_existing"),
+    labels = c("Solar Construction", "Solar Planned", "Hydro Planned", 
+               "Wind Planned", "Hydro Existing", "Geothermal Existing")
+  ) +
+  
+  #Adjust size scale for power plants based on capacity_mw
+  scale_size_continuous(
+    name = "Capacity (MW)",
+    range = c(2, 20)  # Adjust the size range as per your data
+  ) +
+  
+  #Add labels and theme
+  labs(
+    title = "Power Plants in Indonesia",
+    colour = "Power Plant Type & Status",
+    size = "Capacity (MW)"
+  ) +
+  
+  theme_void() +        
+  theme(legend.position = "bottom",
+  plot.title = element_text(hjust = 0.5)
+  ) + 
+  annotation_scale(location = "tr") +
+  annotation_north_arrow(location = "bl", which_north = "true")
+```
+
+From the plot above hydro-power can be seen as the largest contributor to Indonesia's renewable energy mix making up above 30% of the total mix. Geothermal is a close second contributing approximately 20% of the total mix.
+
+Despite Indonesia's high solar potential this only makes up 2-5% of the renewable energy mix!
+
+## Outline of the Methods
+
+This study was conducted in five main steps:
+
+### Total Projected Solar Capacity for 2040
+
+Based on projected energy demand for 2040, the total solar capacity needed was found. This was used as a basis for the number of solar plants needed.
+
+### Solar Interpolation & Number of Solar Plants
+
+Data on the solar radiance of Indonesia was taken for which an interpolation was carried out and the radiance was converted to Global Horizontal Irradiance (GHI). By considering the GHI and the total solar energy demand the number of plants needed was found.
+
+### Preferred Regions for Solar Plant Development
+
+The GHI and population density were taken into consideration to priorities specific regions of the country for solar plant deployment.
+
+### No-go Zones, MCDM/AHP Analysis & Optimal Locations for Solar Plants
+
+The criteria affecting the location of the optimal solar plants as discussed previously were found and weighted. Based on this, suitability maps were generated to find the optimal zones for solar plant locations.
+
+### Financial Analysis
+
+The Net Present Value (NPV) and The Levelized Cost of Energy (LCOE) were found to consider the economic viability of this large-scale project. First finding the Capital Expenditure (CapEx) by considering the cost to build the solar plants and the distance from the plants to the grid.
+
+## Total Projected Solar Capacity for 2040
+
+Based on the projected demand of 843 TWh in 2040 that were discussed previously, the total projected solar capacity that needs to be made up by the new proposed solar plants will be calculated.
+
+**Assumptions**
+
+solar energy generation capacity factor: 0.246
+
+non-renewable energy generation capacity factor: 0.544
+
+percentage of solar energy contribution in energy mix: 38%
+
+installed and upcoming solar capacity: 20,300 MW
+
+```{r}
+demand_mw = 843000000
+consumption_mw = demand_mw / (365*24)
+solar_plants_mw = 20300
+
+solar_cf = 0.246
+nr_cf = 0.544
+solar_c = 0.38
+nr_c = 0.62
+
+nr_total = nr_cf * nr_c
+solar_total = solar_cf * solar_c
+weighted_cf = nr_total + solar_total
+
+total_capacity_mw = consumption_mw / weighted_cf
+
+solar_shortfall_mw = total_capacity_mw * solar_c
+
+solar_2040_mw = solar_shortfall_mw - solar_plants_mw
+
+print(solar_2040_mw)
+```
+
+solar capacity to be made up by the new solar plants was found to be 65 GW!
+
+## Solar Interpolation & Number of Solar Plants
+
+### Solar Interpolation
+
+The Daily Average GHI is found below based on the incoming downward solar radiation, with the data coming from *ECMRWF*. Indonesia has two main seasons wet and dry: November to March and April to October, respectively.
+
+Between the two seasons is where the solar radiation differs the most. Hourly data was used between sunrise (6am) to sunset (6pm) from a couple of the months in each season. The radiance was then averaged between the months and times.
+
+Since it is not possible to measure the radiation at every inch of the country, this data was interpolated.
+
+```{r solar1, echo=FALSE}
+
+process_solar_data <- function(nc_data, extent, resolution) {
+  
+  radiation_to_power <- function(G) {
+    kWh <- G * (1/ 3600000) 
+    return(kWh)
+  }
+  
+  print("Extracting longitude, latitude, and SSRD data...")
+  era_data <- nc_open(nc_data)
+  lon <- ncvar_get(era_data, "longitude")
+  lat <- ncvar_get(era_data, "latitude")
+  time <- ncvar_get(era_data, "valid_time")
+  
+  ssrd_array <- ncvar_get(era_data, "ssrd")
+  
+  print("Calculating average SSRD...")
+  average_ssrd <- apply(ssrd_array, c(1, 2), mean, na.rm = TRUE)
+  
+  print("Converting SSRD data to power (kWh)...")
+  lonlat <- expand.grid(lon, lat)
+  ssrd_vec <- as.vector(average_ssrd)
+  ssrd_df <- data.frame(cbind(lonlat, ssrd_vec))
+  colnames(ssrd_df) <- c("lon", "lat", "ssrd")
+  ssrd_df_value <- na.omit(ssrd_df)
+  
+  print("Converting to Simple Feature (SF)...")
+  ssrd_sf <- st_as_sf(ssrd_df_value, coords = c("lon", "lat"))
+  
+  st_crs(ssrd_sf) <- 4326 
+  ssrd_sf <- st_transform(ssrd_sf, 4326 )
+  
+  coor <- as.data.frame(st_coordinates(ssrd_sf))
+  ssrd_sf$x <- coor$X
+  ssrd_sf$y <- coor$Y
+  ssrd_nogeom <- st_drop_geometry(ssrd_sf)
+  
+  #Define the raster template for the interpolation
+  raster_template <- rast(
+    resolution = resolution,
+    xmin = extent[1], ymin = extent[3], xmax = extent[2], ymax = extent[4],
+    crs = st_crs(indonesia)$wkt
+  )
+  #Perform IDW interpolation
+  gs <- gstat(formula = ssrd ~ 1, locations = ~x + y, data = ssrd_nogeom, nmax = Inf, set = list(idp = 2))
+  idw <- interpolate(raster_template, gs, debug.level = 0)
+  
+
+  ssrd_values <- values(idw)
+  kWh_values <- sapply(ssrd_values, radiation_to_power)
+  kWh_raster <- idw
+  values(kWh_raster) <- kWh_values
+ 
+  kWh_masked <- mask(kWh_raster, indonesia)
+  
+  print("Finished processing data.")
+  
+  # Return the IDW raster with kWh values
+  return(kWh_masked)
+}
+
+setwd("/Users/igla/Desktop/data/indonesia/interpolation/solar/solar months")
+months <- c("december_solar.nc", "february_solar.nc", "july_solar.nc", "may_solar.nc")
+
+
+idw_list <- list()  
+
+indonesia_extent <- as.vector(ext(indonesia))
+indonesia_extent <- unname(indonesia_extent)
+print(indonesia_extent) 
+
+
+for (month_file in months) {
+  print(paste("Processing data for:", month_file))
+  idw_result <- process_solar_data(month_file, indonesia_extent, 0.05)
+  
+  idw_list[[month_file]] <- idw_result
+}
+
+ext(indonesia)
+idw_list <- rast(idw_list)
+
+mean_ <- mean(idw_list, na.rm = TRUE)
+names(mean) <- "Daily Solar Potential (kWh/m^2)" 
+
+tmap_mode("plot")
+tm_shape(mean_) +
+  tm_raster(
+    style = "quantile", 
+    n = 10, 
+    palette = "YlOrRd", 
+    legend.show = TRUE, 
+    title = "Solar Power (kWh/m^2)"
+  ) +
+  tm_shape(indonesia) +
+  tm_borders(col = "black", lwd = 0.5) +
+  tm_layout(
+    main.title = "Daily Average Global Solar Irradiance (GHI)", 
+    main.title.size = 1.5, 
+    main.title.position = "center",
+    frame = FALSE,
+    inner.margins = c(0.05, 0.05, 0.1, 0.1), # Adjust inner margins (bottom, left, top, right)
+    legend.position = c("left", "bottom"),
+    legend.text.size = 0.6,
+    legend.title.size = 0.8
+  ) +
+  tm_scale_bar(position = c(0.2, 0.05), text.size = 0.5, width = 0.15)
+```
+
+From the plot above it can be seen that the region of Java has the highest average GHI! Sulawesi and Sumatra showing high GHI in some areas also.
+
+### Number of Solar Plants
+
+To estimate the number of solar plants required to meet the 65 GW demand, several assumptions were made: a solar panel efficiency of 17.5%, a performance ratio of 60%, and a coverage area of 12 km² per plant. Only regions that are over 4.7 kWh/m^2^ are to be considered, giving an average GHI of 4.9 kWh/m^2^. With the previous assumptions an average power generation per plant is found to be 6.17 GW. This requires a minimum of 11 plants to be built to satisfy the demand (if each plant is 6.17 GW). 
+
+## Preferred Regions for Solar Plant Development
+
+### Population Density by Province
+
+Now we will look at which provinces have the highest population density as this will be where most of the energy demand will be located. The data has been taken from *WorldPop*.
+
+```{r popd}
+
+
+setwd("/Users/igla/Desktop/data/indonesia")
+population_raster <- raster("population_density.tif")
+
+
+lonlat <- as.matrix(expand.grid(x = xFromCol(population_raster, 1:ncol(population_raster)),
+                                y = yFromRow(population_raster, 1:nrow(population_raster))))
+
+
+population_values <- as.vector(values(population_raster))
+
+
+population_df <- data.frame(cbind(lonlat, population_values))
+
+
+colnames(population_df) <- c("lon", "lat", "population_density")
+
+
+population_df_value <- na.omit(population_df)
+
+population_sf<- st_as_sf( population_df_value, coords = c(  "lon", "lat"))
+
+st_crs(population_sf) <- 4326 
+population_sf <- st_transform(population_sf, 4326 )
+
+
+indonesia <- st_transform(indonesia, crs = st_crs(population_sf))
+
+set.seed(123) 
+sampled_population_sf <- population_sf[sample(nrow(population_sf), size = 0.01 * nrow(population_sf)), ]
+
+borough_density <- sampled_population_sf %>%
+  st_join(indonesia, join = st_intersects) %>%
+  group_by(name) %>% 
+  summarise(population_density = mean(population_density, na.rm = TRUE)) 
+
+
+borough_density <- borough_density %>%
+  filter(!is.na(name))
+
+borough_density <- st_drop_geometry(borough_density)
+indonesia <- left_join(indonesia, borough_density, by = "name")
+
+filtered_indonesia <- indonesia %>% 
+  filter(population_density >= 146)
+
+tmap_mode("plot")
+
+tm_shape(indonesia) +
+  tm_fill(col = "population_density", style = "quantile", n = 9, legend.show = FALSE,  palette = "PuRd", alpha = 0.7) +
+  tm_shape(filtered_indonesia) +
+  tm_text("name", size = 0.7, col = "black", shadow = TRUE, fontface = "bold", remove.overlap = TRUE) +
+  tm_layout(
+    main.title = "Population Density of Indonesia by Province", 
+    main.title.size = 1.5,
+    main.title.position = "center",
+    frame = FALSE,
+    inner.margins = c(0.05, 0.05, 0.1, 0.1), 
+    legend.position = c("left", "bottom"),
+    legend.text.size = 0.6,
+    legend.title.size = 0.8
+  ) +
+  tm_borders(lwd = 1, col = "darkgrey") +
+  tm_add_legend(type = "fill", 
+                labels = c("Low", " ", " ", "Medium", " ", " ", "High"),
+                col = c("#F7F4F9", "#C994C7", "#DF65B0", "#E7298A", "#CE1256", "#980043", "#67001F"),
+                border.lwd = 0.5,
+                title = "Population Density") +
+  tm_scale_bar(position = c(0.2, 0.05), text.size = 0.5, width = 0.15) +
+  tm_layout(bg.color = "lavender", legend.title.size = 1, legend.text.size = 0.7)
+```
+
+From the above plot, the Java island (with more than half of the population residing in this region!) shows to have the highest population density as well as a few areas of Sulawesi, in particular: Sulawesi Selatan.
+
+Based on the high population density as well as the high GHI's within these regions of Indonesia, we will narrow down our search for the optimal solar plant locations in these regions: the island of Java and the region of Sulawesi Selatan.
+
+We plan to develop 8 plants in Java and 3 in Sulawesi!
+
+## No-go Zones, MCDM/AHP Analysis & Optimal Locations for Solar Plants
+
+Going forth only the maps of Java will be plotted (since the process for both regions are the same this will save some space). However maps of both Java and Sulawesi will be shown at the end of this project when the optimal plant locations are found.
+
+### No-go Zones
+
+Now we will talk a little about the No-go Zones of Indonesia.
+
+What do No-go Zones mean?
+
+These are zones where solar plants cannot be built on due to regulatory, environmental or land-use constraints. The no-go zones we will include for our research are: Water bodies (for obvious reasons), protected areas and forests.
+
+Deforestation in the country has risen in recent years causing environmental degredation and so these areas will be avoided.
+
+-   **Protected Areas**
+
+    Data from: *Protected Planet*
+
+```{r pa}
+setwd("/Users/igla/Desktop/data/java/no go zones/protected areas")
+protect_polygons <- st_read("WDPA_WDOECM_Jan2025_Public_IDN_shp-polygons.shp")
+
+protect <- protect_polygons[, c(4, 7, ncol(data))]
+
+setwd("/Users/igla/Desktop/data/java/provinces/java provinces")
+java <- st_read("java_provinces.shp")
+
+protect_java <- st_crop(protect, st_bbox(java))
+
+ggplot() +
+  geom_sf(data = java, fill = "ivory", colour = "black") +
+  geom_sf(data = protect_java, fill = "lightseagreen", colour = "darkslategrey") +
+  labs(
+    title = "Protected Areas",
+  )
+```
+
+-   **Water Bodies and Lines**
+
+    Data from: *Digital Chart of the World*
+
+```{r w}
+setwd("/Users/igla/Desktop/data/java/no go zones/water")
+
+water_b <- st_read("IDN_water_areas_dcw.shp")
+water_l <- st_read("IDN_water_lines_dcw.shp")
+
+waterb_java <- st_crop(water_b, st_bbox(java))
+waterl_java <- st_crop(water_l, st_bbox(java))
+
+ggplot() +
+  geom_sf(data = java, fill = "ivory", colour = "black") +
+  geom_sf(data = waterl_java, fill = "blue", colour = "blue") +
+  geom_sf(data = waterb_java, fill = "lightblue", colour = "lightblue") +
+  labs(
+    title = "Water Areas",
+  )
+```
+
+-   **Forest Areas**
+
+    Data from: *ESA, CCI*
+
+```{r for}
+setwd("/Users/igla/Desktop/data/java/no go zones")
+java_forest <- st_read("java_forest.geojson")
+
+ggplot() +
+  geom_sf(data = java, fill = "ivory", colour = "black") +
+  geom_sf(data = java_forest, fill = "green", colour = "green") +
+  labs(
+    title = "Forest Areas",
+  )
+
+```
+
+**All No Go Zones plotted together!**
+
+```{r nogoaall}
+ggplot() +
+  geom_sf(data = java, fill = "ivory", colour = "black") +
+  geom_sf(data = java_forest, fill = "green", colour = "green") +
+  geom_sf(data = waterl_java, fill = "blue", colour = "blue") +
+  geom_sf(data = waterb_java, fill = "lightblue", colour = "lightblue") +
+  geom_sf(data = protect_java, fill = "lightseagreen", colour = "darkslategrey")+
+  labs(
+    title = "No Go Zones vector plot",
+  )
+```
+
+The vectors were raserized and combined in Qgis:
+
+```{r rasternogo}
+setwd("/Users/igla/Desktop/data/java/no go zones")
+no_go_raster <- raster("no_go.tif")
+
+plot(no_go_raster, main = "No Go Zones Raster plot", col = terrain.colors(100))
+```
+
+### MCDM/AHP Analysis
+
+When considering multiple constraints, Multi-Criteria Decision Making (MCDM) methods like Analytic Hierarchy Process (AHP) can help to evaluate and prioritise alternatives. AHP helps structure structure complex decision making by breaking them down into hierarchy of criteria and sub-criteria. Through pair-wise comparisons, it assigns relative weights to each criterion (constraint) based on their importance.
+
+### Constraints
+
+Some constraints are now considered for our analysis. These constraints were put into plots showing the least suitable and most suitable locations regarding the specific constraint. These constraints included included:
+
+-   **Solar** - An obvious constraint, the higher solar radiation a region is exposed to the more efficient the solar plants will be and the smaller in size they can be built.
+
+-   **Slope** - Solar plants built on flat terrain will result in more efficient plants. On average it assumed that a slope of less than 3% is prefered.
+
+-   **Road Proximity** - Plants closer to roads will lead to a more economically viable project
+
+-   **Grid Proximity** - Grid connectivity is a major factor that determines the financial feasibility of the project
+
+#### Solar Constraints
+
+Data from: *ECMWF*
+
+```{r solarcons}
+setwd("/Users/igla/Desktop/data/java/constraints")
+
+solar <- raster("solar_contraint.tif")
+
+plot(solar, main = "Solar Constraints",
+     col = c("red", "orange", "yellow", "green", "darkgreen"),  # 5 distinct colors for 5 bands
+     legend = TRUE,
+     axis.args = list(at = c(1, 2, 3, 4, 5),
+                     labels = c("Least Suitable", "Less Suitable", "Moderately Suitable", "Suitable", "Most Suited")))
+```
+
+#### Slope Constraints
+
+Data from: *CGIAR SRTM* (taken as elevation data and the slope was then calculated using QGIS)
+
+```{r slopecons}
+setwd("/Users/igla/Desktop/data/java/constraints")
+slope <- raster("slope_contraint.tif")
+
+plot(slope, main = "Slope Constraints",
+     col = c("red", "orange", "yellow", "green", "darkgreen"),  # 5 distinct colors for 5 bands
+     legend = TRUE,
+     axis.args = list(at = c(1, 2, 3, 4, 5),
+                     labels = c("Least Suitable", "Less Suitable", "Moderately Suitable", "Suitable", "Most Suited")))
+```
+
+#### Road Constraints
+
+Data from: *Data Chart of the World*
+
+```{r roadcons}
+setwd("/Users/igla/Desktop/data/java/constraints")
+road <- raster("road_constraint.tif")
+
+plot(road, main = "Proximity to Roads Constraints",
+     col = c("red", "orange", "yellow", "green", "darkgreen"),  # 5 distinct colors for 5 bands
+     legend = TRUE,
+     axis.args = list(at = c(1, 2, 3, 4, 5),
+                     labels = c("Least Suitable", "Less Suitable", "Moderately Suitable", "Suitable", "Most Suited")))
+```
+
+#### Grid Constraints
+
+Data from: *OpenStreetMap*
+
+```{r gridcons}
+setwd("/Users/igla/Desktop/data/java/constraints")
+power <- raster("power_contraint.tif")
+
+plot(power, main = "Proximity to Grid Constraints",
+     col = c("red", "orange", "yellow", "green", "darkgreen"),  # 5 distinct colors for 5 bands
+     legend = TRUE,
+     axis.args = list(at = c(1, 2, 3, 4, 5),
+                     labels = c("Least Suitable", "Less Suitable", "Moderately Suitable", "Suitable", "Most Suited")))
+```
+
+More details on how the constraints are classified can be found in the full report.
+
+#### Finding Weights for constraints
+
+```{r ahp}
+#pairwise matrix
+pairwise_matrix <- matrix(c(
+  1,   4,   1/2, 3,
+  1/4, 1,   1/5, 1/2,
+  2,   5,   1,   3,
+  1/3, 2,   1/3, 1
+), nrow = 4, byrow = TRUE)
+
+rownames(pairwise_matrix) <- colnames(pairwise_matrix) <- c(
+  "Proximity to Grid", "Proximity to Roads", "Solar Exposure", "Slope"
+)
+
+
+print(pairwise_matrix)
+```
+
+The pair-wise matrix uses a numerical 1-4 scale where a value of 1 means the two criteria are equally important while 4 indicates a strong preference towards one over the other.
+
+for example in cell in the first row and second column (Proximity to Grid vs. Proximity to Roads) this has a value of 4, indicating that Proximity to Grid is 4 times more important than Proximity to Roads. it's pair-wise value can be found in the first column and second row where 0.25 (1/4) can be found.
+
+Now we will calculate the weight each constraint has on the plant locations!
+
+```{r}
+
+col_sums <- colSums(pairwise_matrix)
+#Normalise
+normalized_matrix <- sweep(pairwise_matrix, 2, col_sums, "/")
+
+#Weights
+weights <- rowMeans(normalized_matrix)
+print(weights)
+```
+
+From the weights, Solar Exposure and Proximity to Grid as the most important factors to consider. This is because insuficient solar exposure would require more solar plants to be built, and more distant plants would require the development of extended transmission lines. Both of these factors drive up the costs massively.
+
+The Slope was not as important as there were only a few regions where the plants were not suitable for development.
+
+Road proximity was of even lower importance due to its lower importance on overall cost. Roads can be more easily built than transmission lines and so it is less critical for the plants to be as close to the roads.
+
+Next it is important to verify the weights all sum up to 1 ensuring the analysis will be valid.
+
+```{r}
+#Verify weights sum to 1
+print(paste("Sum of weights:", sum(weights)))
+```
+
+They do!
+
+In AHP we check consistency of pairwise comparisons to ensure logical decision making. If the comparisons are inconsistent, the derived weights may not be meaningful.
+
+Two key metrics:
+
+-   **Consistency Index (CI):** Derives how much the comparisons deviate from perfect consistency
+
+-   **Consistency Ratio (CR):** Evaluates whether inconsistency is acceptable, comparing CI with a random benchmark RI
+
+if **CR \< 0.10**, the judgments are consistent
+
+```{r ahp2}
+#Calculate lambda max
+lambda_max <- sum(col_sums * weights)
+
+#Calculate Consistency Index (CI)
+n <- nrow(pairwise_matrix)
+CI <- (lambda_max - n) / (n - 1)
+
+#Random Index (RI) for n=4
+RI <- 0.90
+
+#Calculate Consistency Ratio (CR)
+CR <- CI / RI
+
+print(paste("Consistency Ratio:", CR))
+```
+
+CR is 0.028 which is less than 0.10!
+
+## Optimal Locations for Solar Plants
+
+The different maps were then combined and compiled in QGis using the different weights assigned to each constraint where they were then transformed into suitability maps.
+
+To transform the combined map into a suitability map, a threshold was to be determined to create a binary map outlining whether a region is ultimately suitable or not suitable for solar plant development. After the weights were applied to each constraint and the maps were combined together, the range was still 1-5. It was then decided for an area to be suitable the region should be ranked at least a 4.
+
+The suitability map of Java is shown below
+
+```{r suitjava}
+
+setwd("/Users/igla/Desktop/data/java")
+suitability_java <- raster("suitability_map.tif")
+
+
+plot(suitability_java, main = "Suitability Map",
+     col = c("darkgreen", "red"),  # 5 distinct colors for 5 bands
+     legend = TRUE,
+     axis.args = list(at = c(0, 1),
+                     labels = c("Suitable", "Not Suitable")))
+```
+
+## Adding proposed plants
+
+The proposed solar plants are now added to the suitability maps to cover Indonesia's energy demand
+
+```{r propsuitability}
+setwd("/Users/igla/Desktop/data/indonesia/new power plants")
+
+powerplants <- st_read("proposed_power_plants.xlsx")
+
+powerplants <- na.omit(powerplants[, c("longitude", "latitude")])
+# Convert powerplants data to an sf object
+powerplants_sf <- st_as_sf(
+  powerplants,
+  coords = c("longitude", "latitude"), 
+  crs = 23853                          
+)
+
+```
+
+```{r}
+
+# Read and transform provinces
+setwd("/Users/igla/Desktop/data/sumatera/Sumatera provinces")
+sumatera <- st_read("sumatera_u.shp")
+
+# Create copies of powerplants
+powerplants_java <- powerplants_sf
+powerplants_sumatera <- powerplants_sf
+
+# Transform provinces to match powerplants CRS
+java_trans <- st_transform(java, st_crs(powerplants_sf))
+sumatera_trans <- st_transform(sumatera, st_crs(powerplants_sf))
+
+# Clip powerplants to each region
+powerplants_java <- st_intersection(powerplants_java, java_trans)
+powerplants_sumatera <- st_intersection(powerplants_sumatera, sumatera_trans)
+
+# Keep only geometry and maintain as sf objects
+powerplants_java <- st_sf(geometry = st_geometry(powerplants_java))
+powerplants_sumatera <- st_sf(geometry = st_geometry(powerplants_sumatera))
+```
+
+## Sumatera
+
+```{r}
+# For terra
+setwd("/Users/igla/Desktop/data/sumatera")
+suitability_sumatera <- raster("sumatera_suitability_map.tif")
+
+suitability_sumatera <- projectRaster(suitability_sumatera, crs = st_crs(powerplants_sumatera)$wkt)
+
+plot(suitability_sumatera, main = "Suitability Map with Power Plants",
+     col = c("darkgreen", "red"),
+     legend = TRUE,
+     axis.args = list(at = c(0, 1),
+                     labels = c("Suitable", "Not Suitable")))
+
+# Add power plant points with larger size
+plot(powerplants_sumatera, col = "blue", add=TRUE, pch = 19, cex = 2)
+
+# Add legend with border
+legend("topright", 
+       legend = c("Power Plants"),
+       col = c("blue"),
+       pch = 19,
+       pt.cex = 1.5,
+       bg = "white",
+       box.lty = 1,
+       box.lwd = 1)
+```
+
+## Java
+
+```{r}
+suitability_java <- projectRaster(suitability_java, crs = st_crs(powerplants_sumatera)$wkt)
+
+plot(suitability_java, main = "Suitability Map with Power Plants",
+     col = c("darkgreen", "red"),
+     legend = TRUE,
+     axis.args = list(at = c(0, 1),
+                     labels = c("Suitable", "Not Suitable")))
+
+# Add power plant points with larger size
+plot(powerplants_java, col = "blue", add=TRUE, pch = 19, cex = 2)
+
+# Add legend with border
+legend("topright", 
+       legend = c("Power Plants"),
+       col = c("blue"),
+       pch = 19,
+       pt.cex = 1.5,
+       bg = "white",
+       box.lty = 1,
+       box.lwd = 1)
+```
+
+## Financial Analysis
+
+In this section a financial analysis was done to determine whether this large-scale project is feasible. Looking at 3 main indicators:
+
+-   **Net-Present Value (NPV)** - a financial metric that calculates the total value of an investment over time
+
+-   **Lifespan Generation** - the total power output of a plant in a given time period
+
+-   **Levelised Cost of Energy (LCOE)** - a metric used to calculate the average cost per unit of electricity over the power plants lifetime
+
+First the total Capital Expenditure (CapEx) of the plants are needed to proceed. The CapEx was calculated under the assumption that CapEx per MW of installed capacity for building the solar plant is USD 1.16 Mn, together with an additional cost per km for the transition line to connect to the solar plant to the grid being 590 USD/km MW. A total CapEx of USD 76.5 Bn was found. The details of each plant with their distance from the grid can be seen in the full report.
+
+### NPV
+
+If the NPV is greater than zero, the code below will print support and this project will be considered a viable investment.
+
+**Assumptions**
+
+Electricity price: 0.0945 USD/kWh
+
+lifetime: 25 years
+
+For simplicity the Operational Expenditure is assumed to be zero.
+
+```{r}
+capex <- 76514000000  #Capital expenditure
+generation <- 65 * 365 * 24 * 0.24 * 1000000  #Energy generation per year (in kWh)
+annual_revenue <- generation * 0.0945  #Annual revenue (USD)
+
+#NPV Calculation function
+calc_NPV <- function(annual_revenue, i=0.05, lifetime_yrs, CAPEX, OPEX=0){
+  #Time period
+  t <- seq(1, lifetime_yrs, 1)  
+  
+  discounted_revenue <- sum(annual_revenue / (1 + i)^t) 
+  # NPV calculation
+  NPV <- discounted_revenue - CAPEX  
+  return(round(NPV, 0))  
+}
+
+# Calculate NPV for the given inputs
+npv <- calc_NPV(annual_revenue = annual_revenue, lifetime_yrs = 25, CAPEX = capex)
+# Output result: Support if NPV > 0, otherwise "object"
+ifelse(npv > 0, "Support", "Object")
+```
+
+Support! The projects NPV stands at USD 105 Bn, indicating a strong profitability and long-term financial viability.
+
+### Lifespan Generation
+
+**Assumptions**
+
+discount rate: 0.03 (since money today is worth more than the same amount of that in the future we need to consider the discount rate)
+
+```{r}
+Life_span_generation_kWH <- function (yearly_generation_kWH, discount = 0.03, lifetime_yrs = 25){
+  t<- seq(1, lifetime_yrs, 1)
+  L_S_G <- sum(yearly_generation_kWH/(1+discount)**t)
+  return (round(L_S_G,0))
+}
+
+life_span <-Life_span_generation_kWH(generation)
+print(life_span)
+```
+
+Generating 2370 TWh for 25 years is an excellent output for a large-scale solar plant!
+
+This is approximately 260,000,000 kWh per day, considering an average household in Indonesia consumes around 1,200 kWh per day, this is enough to power 79 million homes!
+
+### LCOE
+
+**Assumptions**
+
+CapEx is used as a proxy for the NPV cost
+
+```{r}
+LCOE <- function(NPV_cost, Life_span_generation){
+  lcoe <- NPV_cost/Life_span_generation
+  return(round(lcoe,2))
+}
+
+LCOE(capex, life_span)
+```
+
+A value of 0.03 USD/kWh is found, suggesting this project is highly cost effective compared to traditional energy sources and aligns with the global trend of record-low solar PV auction prices as reported by IRENA in 2018
+
+## Conclusion
+
+This large-scale solar project, with a 65 GW capacity and 137 TWh annual generation, offers a solid financial outlook with an NPV of USD 105 billion. The project generates nearly USD 13 billion annually. With a low LCOE of USD 0.03/kWh and a long operational lifespan, the project provides a cost-effective solution to meet Indonesia's growing energy demand while reducing reliance on fossil fuels. Overall, the project promises robust returns, sustainability, and aligns with Indonesia's renewable energy goals, making it a highly attractive investment.
+
+## References
+
+Agung Wahyuono, R. and Magenika Julian, M. (2018). ‘Revisiting Renewable Energy Map in Indonesia: Seasonal Hydro and Solar Energy Potential for Rural Off-Grid Electrification (Provincial Level)’. in *MATEC Web of Conferences*. EDP Sciences. doi: 10.1051/matecconf/201816401040.
+
+Charabi, Y., Rhouma, M. B. H. and Gastli, A. (2014). ‘Siting of pv power plants on inclined terrains’. *International Journal of Sustainable Energy*. Taylor and Francis Ltd., 35 (9), pp. 834–843. doi: 10.1080/14786451.2014.952298.
+
+Ember. (2023). *Indonesia’s expansion of clean power can spur growth and equality*. *Ember Energy*. Available at: <https://ember-energy.org/latest-insights/indonesias-expansion-of-clean-power-can-spur-growth-and-equality/#:~:text=Under%20the%20RUPTL%2C%2021%20GW,growth%20in%20the%20local%20economy.> (Accessed: 10 January 2025).
+
+International Energy Agency (IEA). (2023). *Indonesia*. [*https://www.iea.org/countries/indonesia/energy-mix*](https://www.iea.org/countries/indonesia/energy-mix). Available at: <https://www.iea.org/countries/indonesia> (Accessed: 25 December 2024).
+
+Kadek Aldrin Wiguna, R. S. N. F. A. (2016). ‘Optimization Solar Farm site selection using Multi-Criteria Decision Making Fuzzy AHP and PROMETHEE: case study in Bali’. in. Surabaya, Indonesia: IEEE. doi: 10.1109/ICTS.2016.7910305.
+
+Ruiz, H. S., Sunarso, A., Ibrahim-Bathis, K., Murti, S. A. and Budiarto, I. (2020). ‘GIS-AHP Multi Criteria Decision Analysis for the optimal location of solar energy plants at Indonesia’. *Energy Reports*. Elsevier Ltd, 6, pp. 3249–3263. doi: 10.1016/j.egyr.2020.11.198.
+
+World Bank. (2014). *World Bank and Environment in Indonesia*. *World Bank*. Available at: <https://www.worldbank.org/en/country/indonesia/brief/world-bank-and-environment-in-indonesia> (Accessed: 25 December 2024).
+
+World Bank. (2024). *Population Estimates and Projections*. *World Bank DataBank*. Available at: <https://databank.worldbank.org/source/population-estimates-and-projections> (Accessed: 17 December 2024).
