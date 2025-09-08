@@ -156,7 +156,7 @@ This methodology framework can be adapted for:
 
 ## Author
 
-**[Igla Musollari]** - *Master's Project, University College London (UCL)* 
+**[Igla Musollari]** - *University College London (UCL)* 
 ---
 
 *This project was completed as part of a Master's degree at University College London (UCL). The methodology demonstrates a comprehensive approach to renewable energy site selection combining technical, economic, and social considerations for developing nations' energy transition planning.*
