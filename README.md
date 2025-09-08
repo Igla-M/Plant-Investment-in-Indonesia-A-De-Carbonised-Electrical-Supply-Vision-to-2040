@@ -9,14 +9,11 @@ Analyzing optimal locations for large-scale solar installations across Indonesia
    * [Prerequisites](#prerequisites)
 3. [Methodology](#methodology)
 4. [Key Assumptions](#key-assumptions)
-5. [Key Visuals](#key-visuals)
-6. [Author](#author)
+5. [Author](#author)
 
 ## About The Project
 
-Indonesia aims to achieve 38% solar energy contribution to its energy mix by 2040, requiring significant additional capacity beyond the current 20,300 MW. This project provides a comprehensive analysis to strategically identify optimal solar plant locations using data-driven approaches.
-
-The study combines solar resource assessment, population analysis, multi-criteria decision-making (MCDM), and economic modeling to determine the most suitable regions for solar deployment while maximizing efficiency and economic viability.
+This report aims to identify suitable locations for solar sites in Indonesia to meet 38% of the country’s projected energy demand by 2040, and ultimately assess the economic viability of this large-scale project.
 
 **Keywords:** solar energy planning, geospatial analysis, Indonesia energy transition, MCDM, renewable energy optimization, solar resource assessment
 
@@ -102,14 +99,6 @@ The analysis follows a systematic five-step approach:
 | Target Solar Contribution | 38% |
 | Current/Planned Solar Capacity | 20,300 MW |
 
-## Key Visuals
-
-The analysis generates several key outputs:
-* **Solar Resource Maps:** GHI distribution across Indonesian archipelago
-* **Priority Regions Map:** Ranked areas for solar development based on resource potential and population
-* **Suitability Maps:** Spatial analysis showing optimal vs. restricted zones
-* **Economic Assessment Charts:** NPV and LCOE calculations for different scenarios
-* **Plant Location Recommendations:** Specific coordinates for proposed solar installations
 
 ## Author
 * **[Igla Musollari]** - *Renewable Energy Systems Analysis* 
