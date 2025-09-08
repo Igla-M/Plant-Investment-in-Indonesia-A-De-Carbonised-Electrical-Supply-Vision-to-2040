@@ -11,7 +11,6 @@ Analyzing optimal locations for large-scale solar installations across Indonesia
 4. [Key Assumptions](#key-assumptions)
 5. [Key Visuals](#key-visuals)
 6. [Author](#author)
-7. [License](#license)
 
 ## About The Project
 
@@ -113,9 +112,4 @@ The analysis generates several key outputs:
 * **Plant Location Recommendations:** Specific coordinates for proposed solar installations
 
 ## Author
-
-* **[Your Name]** - *Renewable Energy Systems Analysis* - [Your Contact/Website]
-
-## License
-
-This project is licensed under the [License Type] - see the LICENSE.md file for details.
+* **[Igla Musollari]** - *Renewable Energy Systems Analysis* 
